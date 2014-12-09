@@ -10,7 +10,7 @@
 
 <br>
 
-<canvas id="canvas" style="border:1px solid #d3d3d3;background:#ffffff;" height="600" width="600"></canvas>
+<canvas id="canvas" style="border:1px solid #d3d3d3;background:#ffffff;" height="200" width="400"></canvas>
 <script src="js/tuner.js"></script>
 <script src="js/audioTools.js"></script>
 
