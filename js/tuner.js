@@ -21,7 +21,7 @@ var canvasCtx= c.getContext("2d");
 var chromCircle = new Image();
 chromCircle.src = 'img/chromaticCircle.png';
 
-var fps = 12;
+var fps = 16;
 var now;
 var then = Date.now();
 var interval = 1000/fps;
@@ -32,7 +32,10 @@ var audioCtx = new (window.AudioContext || window.webkitAudioContext)() ;
 var analyser = audioCtx.createAnalyser();
 
 var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-var TO_RADIANS = Math.PI/180; 
+var TO_RADIANS = Math.PI/180;
+
+var prevAudioData = 0; 	//previous spectrum to be averaged
+var prevF0 = 0;
 
 //Get audio input through microphone
 try {
@@ -66,28 +69,34 @@ function getFrequency(){
 	bufferSize = analyser.frequencyBinCount;
 	var data = new Float32Array(bufferSize); 
 	analyser.getFloatFrequencyData(data);
-	
-	//console.log(data);
-	var peaks = getPeaks(data, -60)[1];		//Store peak indices
-	var peakBins = [];	
-	var peakMags = [];	
-	
-	//console.log(peaks);
-	for (var i = 0; i < peaks.length; i++){
-		peak = peaks[i];
-		var tmp = peakInterpolate(peak-1, data[peak-1], peak, data[peak], peak+1, data[peak+1]); 	//store tuple
-		peakBins.push(tmp[0]);		
-		peakMags.push(tmp[1]);
+
+	if (prevAudioData != 0) {
+
+		if (prevAudioData != null) {
+			data = numeric.div(numeric.add(data, prevAudioData), 2); 		//average previous data
+		}	
+
+		var peaks = getPeaks(data, -60)[1];		//Store peak indices above threshold
+		var peakBins = [];	
+		var peakMags = [];	
+		
+		for (var i = 0; i < peaks.length; i++){
+			peak = peaks[i];
+			var tmp = peakInterpolate(peak-1, data[peak-1], peak, data[peak], peak+1, data[peak+1]); 	//store tuple
+			peakBins.push(tmp[0]);		
+			peakMags.push(tmp[1]);
+		}
+		
+		var bin2Freq = audioCtx.sampleRate/2/bufferSize		//Factor to convert bin to frequency
+		f0 = f0Detection(peakBins, peakMags, 30, 1000, audioCtx.sampleRate, bufferSize);
+		
+		prevAudioData = 0;			//Reset to 
+		return f0;
 	}
-	
-	//console.log(peakBins + " - " + peakMags);
-	
-	var bin2Freq = audioCtx.sampleRate/2/bufferSize		//Factor to convert bin to frequency
-	var minFreqBin = 30/bin2Freq
-	var maxFreqBin = 1500/bin2Freq
-	f0 = f0Detection(peakBins, peakMags, 30, 1500, audioCtx.sampleRate, bufferSize);
-	
-	return f0;
+	else {
+		prevAudioData = data;
+		return prevF0;
+	}
 }
 
 function rotateImg(image, angle){
@@ -116,10 +125,11 @@ function update(){
 
 	now = Date.now();
 	delta = now - then;
-	//console.log(delta);
 	
 	if (delta > interval) {
-		var freq = Math.round(getFrequency());
+
+		var freq = getFrequency();
+		prevF0 = freq;	
 		var cents = "-";
 		var note = "-";
 		var angle = 0;
@@ -131,6 +141,7 @@ function update(){
 			angle = cents2angle(cents);		
 			cents = note[1];
 			note = note[0];
+			freq = Math.round(freq);
 		}
 
 		else freq = "-";	//To draw string
@@ -139,7 +150,7 @@ function update(){
 		
 		rotateImg(chromCircle, angle);
 		
-		(Math.abs(cents) < 3) ? drawTriangle("green") : drawTriangle("red");
+		(Math.abs(cents) <= 3) ? drawTriangle("green") : drawTriangle("red");
 
 		canvasCtx.font="30px Verdana";
 		canvasCtx.fillText("Frequency: " + freq + " Hz",150,240);
