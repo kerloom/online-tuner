@@ -35,7 +35,9 @@ var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B
 var TO_RADIANS = Math.PI/180;
 
 var prevAudioData = 0; 	//previous spectrum to be averaged
-var prevF0 = 0;
+var prevF0 = [0,0,0,0,0,0];	//Use odd number for average decision
+var dataGlob = 0;
+var peaksGlob = 0;
 
 //Get audio input through microphone
 try {
@@ -74,9 +76,11 @@ function getFrequency(){
 
 		if (prevAudioData != null) {
 			data = numeric.div(numeric.add(data, prevAudioData), 2); 		//average previous data
+			dataGlob = data;
 		}	
 
 		var peaks = getPeaks(data, -60)[1];		//Store peak indices above threshold
+		peaksGlob = peaks;
 		var peakBins = [];	
 		var peakMags = [];	
 		
@@ -87,7 +91,6 @@ function getFrequency(){
 			peakMags.push(tmp[1]);
 		}
 		
-		var bin2Freq = audioCtx.sampleRate/2/bufferSize		//Factor to convert bin to frequency
 		f0 = f0Detection(peakBins, peakMags, 30, 1000, audioCtx.sampleRate, bufferSize);
 		
 		prevAudioData = 0;			//Reset to 
@@ -95,7 +98,7 @@ function getFrequency(){
 	}
 	else {
 		prevAudioData = data;
-		return prevF0;
+		return prevF0[prevF0.length-1];
 	}
 }
 
@@ -120,6 +123,87 @@ function drawTriangle(color){
 	canvasCtx.fill();
 }
 
+function drawSpectro(data, peaks){
+	//Debugging purposes
+	var binWidth = 1;//Math.floor(c.width / (data.length/2));
+	var HEIGHT_MULT = 5;
+	var xOffset = 40;
+	var yOffset = c.height - 20;
+	var bin2Freq = audioCtx.sampleRate/2/bufferSize		//Factor to convert bin to frequency
+
+	for (var i = 0; i < data.length; i++){
+		var barHeight = (100 + data[i]) * -1 * HEIGHT_MULT;
+
+		if(peaks.indexOf(i) != -1) {
+			var pk = peaks[peaks.indexOf(i)];
+			var peak = peakInterpolate(pk-1, data[pk-1], pk, data[pk], pk+1, data[pk+1])[0];
+			var freq = (peak * bin2Freq).toFixed(1);
+
+			canvasCtx.fillStyle = "red";
+			canvasCtx.font="8px Verdana";
+			canvasCtx.fillText(freq + "Hz", i + 5 + xOffset, c.height + barHeight - 7);	
+		}
+
+		canvasCtx.fillRect(i + xOffset, yOffset, binWidth, barHeight);
+		canvasCtx.fillStyle = "black";
+	}
+
+	//Leyends
+	canvasCtx.fillStyle = "white";
+	canvasCtx.fillRect(0, yOffset, c.width, yOffset + c.height);	//Clean space beneath offset
+	
+	canvasCtx.fillStyle = "black";
+	canvasCtx.font="10px Verdana";
+	
+	//Horizontal
+	for (var i = xOffset; i < c.width; i+=50) {
+		var freq = Math.round((i - xOffset + 1) * bin2Freq);
+		
+		canvasCtx.fillRect(i, yOffset, 1, 5);
+		canvasCtx.fillText(freq, i - 10, yOffset + 15);		
+	}
+
+	//Vertical
+	for(var i = yOffset; i > 0; i-=50){
+		var dBs = Math.round(-(i * 100 / yOffset));
+		canvasCtx.fillRect(xOffset, i, -5, 1);
+		canvasCtx.fillText(dBs, 12, i + 5);
+	}
+}
+
+function meanFreq(freqs) {
+	//Average removing octave errors (freqs with err larger than half the range)
+	var avg = numeric.sum(freqs)/freqs.length;
+	var max = Math.max.apply(null, freqs);
+	var min = Math.min.apply(null, freqs);
+	var midFreq = (max+min)/2;
+	var rmIdx = []; //Indices to remove
+
+	if (Math.abs(max-avg) > Math.abs(min-avg)) {
+		//We need to remove the higher freqs
+		for(var i = 0; i < freqs.length; i++){
+			if(freqs[i] > midFreq) rmIdx.push(i);
+		}
+	}
+	else {
+		//We need to remove the lower freqs
+		for(var i = 0; i < freqs.length; i++){
+			if(freqs[i] < midFreq) rmIdx.push(i);
+		}
+	}
+
+	if(rmIdx.length != 0) {
+		var offset = 0;	//offset to account for array removals
+
+		for (i in rmIdx) {
+			freqs.splice(rmIdx[i]-offset,1);
+			offset++;
+		}
+	}
+
+	return numeric.sum(freqs)/freqs.length;
+}
+
 //Looping function to redraw and recalculate.
 function update(){
 
@@ -129,11 +213,30 @@ function update(){
 	if (delta > interval) {
 
 		var freq = getFrequency();
-		prevF0 = freq;	
+		prevF0.shift();
+		prevF0.push(freq);
+			//console.log(prevF0);
 		var cents = "-";
 		var note = "-";
 		var angle = 0;
 
+		
+		if (prevF0.indexOf(-1) == -1) {
+			// All frequencies are valid
+			freq = meanFreq(prevF0);
+
+			cents = freq2cents(freq); 	//store temp absolute note in cents
+			note = cents2note(cents); 	//Store temp array
+			angle = cents2angle(cents);		
+			cents = note[1];
+			note = note[0];
+			freq = Math.round(freq);
+			
+		} else {
+			freq = -1;
+			freq = "-";	//To draw string
+		}
+/*
 		//Frequency resolved
 		if (freq != -1) {
 			cents = freq2cents(freq); 	//store temp absolute note in cents
@@ -145,17 +248,19 @@ function update(){
 		}
 
 		else freq = "-";	//To draw string
-
+*/
 		canvasCtx.clearRect(0, 0, c.width, c.height);
 		
 		rotateImg(chromCircle, angle);
-		
 		(Math.abs(cents) <= 3) ? drawTriangle("green") : drawTriangle("red");
+		
+		
+		//drawSpectro(dataGlob, peaksGlob); //For debugging
 
 		canvasCtx.font="30px Verdana";
-		canvasCtx.fillText("Frequency: " + freq + " Hz",150,240);
-		canvasCtx.fillText("Note: " + note, 150, 300);
-		canvasCtx.fillText("Cents: " + cents, 150, 360);
+		canvasCtx.fillText("Frequency: " + freq + " Hz",200, 140);
+		canvasCtx.fillText("Note: " + note, 200, 200);
+		canvasCtx.fillText("Cents: " + cents, 200, 260);
 		
 		then = now - (delta % interval);
 
