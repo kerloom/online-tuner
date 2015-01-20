@@ -191,6 +191,50 @@ function closestHarmonics(origin, target, amplitudes){
 	return [closestHarmonics, predictedAmps];	//return also predicted amps to use in PTM
 }
 
+function trimArray (array, thresh) {
+	//Trims array to return most common close frequencies within threshold(%)
+	var arr = array.slice(0);
+	var indices = [];
+	var freqGroups = [];
+	var off = 0;		//offset to account for item removals in array
+	
+	for (var i = 0; i < arr.length; i++) {
+		indices.push(i);
+	}
+
+	for(var i = 0; i < indices.length; i++) {
+		var idx = indices[i];
+		var freqMatches = [arr[idx]];
+		
+		for(var j = 0; j < arr.length; j++) {
+			if(isClose(arr[idx], arr[j], thresh) && j != idx) { //if close and not self
+				indices.splice(j-off,1);	//Remove repeated index of frequency in thresh
+				freqMatches.push(arr[j]);
+				off++;
+			}
+		}
+		
+		freqGroups.push(freqMatches);
+		
+	}
+	
+	var count = [];
+	for(var i = 0; i < freqGroups.length; i++) {
+		count.push(freqGroups[i].length);
+	}
+	
+	var maxCount = Math.max.apply(null, count);
+	try{
+		maxIdx = count.indexOf(maxCount);
+		return freqGroups[maxIdx]
+	}
+	catch (err){
+		console.log("Err- Could not determine most common frequency group");
+		console.log(err.message);
+		return null
+	}
+}
+
 
 //AUXILIARES
 function genArray(N){
@@ -200,4 +244,8 @@ function genArray(N){
 		arr.push(i);
 	}
 	return arr;
+}
+
+function isClose(origin, target, thresh) {
+	 return Math.abs(origin - target) < thresh*origin ? true: false;
 }

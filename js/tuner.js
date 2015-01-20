@@ -35,7 +35,7 @@ var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B
 var TO_RADIANS = Math.PI/180;
 
 var prevAudioData = 0; 	//previous spectrum to be averaged
-var prevF0 = [0,0,0,0,0,0];	//Use odd number for average decision
+var prevF0 = [0,0,0,0,0,0];	//record of previous F0 to be averaged
 var dataGlob = 0;
 var peaksGlob = 0;
 
@@ -172,36 +172,9 @@ function drawSpectro(data, peaks){
 }
 
 function meanFreq(freqs) {
-	//Average removing octave errors (freqs with err larger than half the range)
-	var avg = numeric.sum(freqs)/freqs.length;
-	var max = Math.max.apply(null, freqs);
-	var min = Math.min.apply(null, freqs);
-	var midFreq = (max+min)/2;
-	var rmIdx = []; //Indices to remove
-
-	if (Math.abs(max-avg) > Math.abs(min-avg)) {
-		//We need to remove the higher freqs
-		for(var i = 0; i < freqs.length; i++){
-			if(freqs[i] > midFreq) rmIdx.push(i);
-		}
-	}
-	else {
-		//We need to remove the lower freqs
-		for(var i = 0; i < freqs.length; i++){
-			if(freqs[i] < midFreq) rmIdx.push(i);
-		}
-	}
-
-	if(rmIdx.length != 0) {
-		var offset = 0;	//offset to account for array removals
-
-		for (i in rmIdx) {
-			freqs.splice(rmIdx[i]-offset,1);
-			offset++;
-		}
-	}
-
-	return numeric.sum(freqs)/freqs.length;
+	var f0s = trimArray(freqs, 0.03); 
+	console.log(f0s.length);
+	return numeric.sum(f0s)/f0s.length;
 }
 
 //Looping function to redraw and recalculate.
@@ -220,7 +193,7 @@ function update(){
 		var note = "-";
 		var angle = 0;
 
-		
+		//TODO: Improve cents stability		
 		if (prevF0.indexOf(-1) == -1) {
 			// All frequencies are valid
 			freq = meanFreq(prevF0);
