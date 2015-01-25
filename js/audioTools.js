@@ -38,6 +38,7 @@ function freq2cents (freq) {
 
 function cents2note (cents){
 	//Returns note name
+	var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 	var noteNum = Math.round(cents/100);
 	var note = NOTE_NAMES[noteNum % 12];
 	var centsOff = cents - noteNum*100;
@@ -172,7 +173,7 @@ function TWM_err(predicted, measured, amplitudes){
 }
 
 function closestHarmonics(origin, target, amplitudes){
-	//chooses closest harmonic and amplitude from target compared to origin
+	//chooses closest harmonic and amplitude from target compared to origin to use with TWM
 	var closestHarmonics = [];
 	var predictedAmps = [];
 	//TODO : Sort origin to be sure and optimize to break when match is found
@@ -188,7 +189,7 @@ function closestHarmonics(origin, target, amplitudes){
         closestHarmonics.push(curr);
         predictedAmps.push(currAmp);
 	}
-	return [closestHarmonics, predictedAmps];	//return also predicted amps to use in PTM
+	return [closestHarmonics, predictedAmps];	//return also predicted amps to use in PTM err
 }
 
 function trimArray (array, thresh) {

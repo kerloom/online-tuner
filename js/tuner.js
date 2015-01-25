@@ -79,7 +79,7 @@ function getFrequency(){
 			dataGlob = data;
 		}	
 
-		var peaks = getPeaks(data, -60)[1];		//Store peak indices above threshold
+		var peaks = getPeaks(data, -70)[1];		//Store peak indices above threshold
 		peaksGlob = peaks;
 		var peakBins = [];	
 		var peakMags = [];	
@@ -155,7 +155,7 @@ function drawSpectro(data, peaks){
 	canvasCtx.fillStyle = "black";
 	canvasCtx.font="10px Verdana";
 	
-	//Horizontal
+	//Horizontal Label
 	for (var i = xOffset; i < c.width; i+=50) {
 		var freq = Math.round((i - xOffset + 1) * bin2Freq);
 		
@@ -163,7 +163,7 @@ function drawSpectro(data, peaks){
 		canvasCtx.fillText(freq, i - 10, yOffset + 15);		
 	}
 
-	//Vertical
+	//Vertical Label
 	for(var i = yOffset; i > 0; i-=50){
 		var dBs = Math.round(-(i * 100 / yOffset));
 		canvasCtx.fillRect(xOffset, i, -5, 1);
@@ -173,7 +173,7 @@ function drawSpectro(data, peaks){
 
 function meanFreq(freqs) {
 	var f0s = trimArray(freqs, 0.03); 
-	console.log(f0s.length);
+
 	return numeric.sum(f0s)/f0s.length;
 }
 
@@ -209,26 +209,14 @@ function update(){
 			freq = -1;
 			freq = "-";	//To draw string
 		}
-/*
-		//Frequency resolved
-		if (freq != -1) {
-			cents = freq2cents(freq); 	//store temp absolute note in cents
-			note = cents2note(cents); 	//Store temp array
-			angle = cents2angle(cents);		
-			cents = note[1];
-			note = note[0];
-			freq = Math.round(freq);
-		}
 
-		else freq = "-";	//To draw string
-*/
 		canvasCtx.clearRect(0, 0, c.width, c.height);
 		
 		rotateImg(chromCircle, angle);
 		(Math.abs(cents) <= 3) ? drawTriangle("green") : drawTriangle("red");
 		
 		
-		//drawSpectro(dataGlob, peaksGlob); //For debugging
+		drawSpectro(dataGlob, peaksGlob); //For debugging
 
 		canvasCtx.font="30px Verdana";
 		canvasCtx.fillText("Frequency: " + freq + " Hz",200, 140);
